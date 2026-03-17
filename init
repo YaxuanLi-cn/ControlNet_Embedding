@@ -1,0 +1,24 @@
+conda create -n dreamnav python=3.9
+conda activate dreamnav
+
+pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+
+pip install -r requirements.txt
+
+pip install -U gdown 
+gdown --fuzzy 'https://drive.google.com/file/d/1yOyFBAAvLiqfxK8tUKm3togeN3Bu2KAO/view'
+
+cd pairUAV
+bash data_process.sh
+cd ..
+
+pip install transformers==4.19.2
+
+huggingface-cli download --resume-download lllyasviel/ControlNet models/control_sd15_normal.pth --local-dir ./models
+mv ./models/models/control_sd15_normal.pth ./models/control_sd15_normal.pth
+rm -rf ./models/.cache
+rm -rf ./models/models
+
+huggingface-cli download --resume-download openai/clip-vit-large-patch14 --local-dir ./models/clip-vit-large-patch14
+
+python tutorial_train.py

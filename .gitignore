@@ -1,0 +1,8 @@
+__pycache__/
+cldm/__pycache__/
+image_log/
+ldm/__pycache__/
+lightning_logs/
+models/
+pairUAV/
+training/
