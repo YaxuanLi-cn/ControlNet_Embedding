@@ -396,16 +396,17 @@ class ControlLDM(LatentDiffusion):
                                              range_max=range_max,
                                              range_min=range_min)
 
-        # Projection MLP: 4K  →  context_dim
+        # Projection MLP: 4K  →  77 * context_dim  (match CLIP sequence length)
+        self.num_tokens = 77
         enc_dim = 4 * heading_range_K
         self.cond_projection = nn.Sequential(
             nn.Linear(enc_dim, context_dim),
             nn.SiLU(),
-            nn.Linear(context_dim, context_dim),
+            nn.Linear(context_dim, self.num_tokens * context_dim),
         )
 
     # --------------------------------------------------------------------- #
-    #  Encode heading + range into a (B, 1, context_dim) context tensor      #
+    #  Encode heading + range into a (B, 77, context_dim) context tensor      #
     # --------------------------------------------------------------------- #
     def encode_heading_range(self, heading_num, range_num):
         """Produce cross-attention context from scalar heading & range values.
@@ -414,13 +415,13 @@ class ControlLDM(LatentDiffusion):
             heading_num: (B,) heading in degrees.
             range_num:   (B,) range / distance value.
         Returns:
-            (B, 1, context_dim) tensor ready for cross-attention.
+            (B, 77, context_dim) tensor ready for cross-attention.
         """
         h_enc = self.heading_encoder(heading_num)    # (B, 2K)
         r_enc = self.range_encoder(range_num)        # (B, 2K)
         enc = torch.cat([h_enc, r_enc], dim=-1)      # (B, 4K)
-        proj = self.cond_projection(enc)              # (B, context_dim)
-        return proj.unsqueeze(1)                      # (B, 1, context_dim)
+        proj = self.cond_projection(enc)              # (B, 77 * context_dim)
+        return proj.reshape(-1, self.num_tokens, self.context_dim)  # (B, 77, context_dim)
 
     # --------------------------------------------------------------------- #
     #  get_input  –  bypasses CLIP, encodes heading + range directly         #
@@ -478,7 +479,7 @@ class ControlLDM(LatentDiffusion):
     @torch.no_grad()
     def get_unconditional_conditioning(self, N):
         # Zero context as "unconditional" for classifier-free guidance
-        return torch.zeros(N, 1, self.context_dim, device=self.device)
+        return torch.zeros(N, self.num_tokens, self.context_dim, device=self.device)
 
     @torch.no_grad()
     def log_images(self, batch, N=4, n_row=2, sample=False, ddim_steps=50, ddim_eta=0.0, return_keys=None,
